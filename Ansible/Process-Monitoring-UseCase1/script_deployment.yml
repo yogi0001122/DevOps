@@ -1,0 +1,48 @@
+- hosts: monitoringservers
+  vars:
+   #python -c 'import crypt; print crypt.crypt("Welcome123", "$1$SomeSalt$")'
+   password: $1$SomeSalt$iFVr0BvGMyB4ZTvTsmWZx/
+
+  tasks:
+     - name: Check user details
+       shell: cat /etc/passwd|grep "monitor"|awk -F':' '{print $1}'
+       register: userinfo
+
+     - user: name=monitor password={{password}}
+       when: userinfo.stdout == ''
+       become: true
+
+     - name: Creation of directory on remote server
+       file:
+         path: /opt/script
+         state: directory
+         owner: monitor
+         group: monitor
+         mode: 0755
+       register: result
+       become: true
+
+     - debug:
+        var: result
+
+     - copy:
+         src: processcheck.sh
+         dest: /opt/script/
+         owner: monitor
+         group: monitor
+         mode: 0755
+       register: myoutput
+       become: true
+
+     - debug:
+         var: myoutput
+
+     - name: Ensure a job that runs Mon to Fri every 2 min."
+       cron:
+         name: "check process"
+         minute: "*/2"
+         hour: "*"
+         weekday: "1-5"
+         job: "bash /opt/script/processcheck.sh > /tmp/processcheck.log 2>&1"
+       become: true
+       become_user: monitor
